@@ -33,20 +33,20 @@ int main(int, char **)
     int UpdateEveryNFrames = 6;
     int FramesPassed = 0;
     float BallDiameter = .07; // m
-    float PixelGravity;
-    
+
     int FPS = 30.0;
     float TimeStepSize = 1.0 / FPS;
 
     int EulerSteps = 18;
 
-    Scalar color = Scalar(0, 0, 255);
+    Scalar color = Scalar(0, 25, 255);
 
     Mat frame, hsv_frame, thresh_frame;
     std::deque<Point> Trajectory;
     std::deque<Point> Last_Trajectory;
     std::deque<std::deque<Point>> Predictions;
-    
+    std::deque<std::deque<Point>> Last_Predictions;
+
     for (;;)
     {
         FramesPassed++;
@@ -68,7 +68,7 @@ int main(int, char **)
             approxPolyDP(contours[i], contours_poly[i], 3, true);
             minEnclosingCircle(contours_poly[i], centers[i], radius[i]);
         }
-        Mat drawing = frame; 
+        Mat drawing = frame;
         if (contours.size() > 2)
         {
             // Find the Ball by Largest Contour
@@ -85,7 +85,7 @@ int main(int, char **)
                 Trajectory.push_back(centers[max_contour_id]);
                 Trajectory.pop_front();
             }
-            Point V0 = Point(0,0);
+            Point V0 = Point(0, 0);
             //DrawTrueTrajectory(Trajectory,drawing);
             for (unsigned i = 0; i < Trajectory.size() - 1; i++)
             {
@@ -94,23 +94,35 @@ int main(int, char **)
                 line(drawing, Trajectory.at(i) + Point(0, 10), Trajectory.at(i) + Point(0, -10), Scalar(255, 0, 0), 6, 8);
                 line(drawing, Trajectory.at(i), Trajectory.at(i + 1), Scalar(255, 0, 0), 4, 8);
             }
-            if (Trajectory.size() > 2 ){
+            if (Trajectory.size() > 2)
+            {
                 V0 = Point(Trajectory.at(Trajectory.size() - 1).x - Trajectory.at(Trajectory.size() - 2).x, Trajectory.at(Trajectory.size() - 1).y - Trajectory.at(Trajectory.size() - 2).y);
-            } 
+            }
 
-            int PixelsPerMeter = (2 * radius[max_contour_id])/ BallDiameter;
+            int PixelsPerMeter = (2 * radius[max_contour_id]) / BallDiameter;
 
             Point start = Trajectory.back();
             Point curr = start;
             Point last = curr;
             //DrawPredictedTrajectory(Trajectory,drawing);
+            std::deque<Point> Temp;
             for (int t = 1; t < EulerSteps; t++)
             {
-                curr = Point(start.x + V0.x * t, start.y + V0.y * t - .5 * -9.81 * PixelsPerMeter * ((TimeStepSize*t) * (TimeStepSize*t)));
+                curr = Point(start.x + V0.x * t, start.y + V0.y * t - .5 * -9.81 * PixelsPerMeter * ((TimeStepSize * t) * (TimeStepSize * t)));
                 line(drawing, curr + Point(10, 0), curr + Point(-10, 0), Scalar(255, 0, 255), 6, 8);
                 line(drawing, curr + Point(0, 10), curr + Point(0, -10), Scalar(255, 0, 255), 6, 8);
                 line(drawing, last, curr, Scalar(255, 0, 255), 4, 8);
+                Temp.push_back(curr);
                 last = curr;
+            }
+            if (Predictions.size() < 10)
+            {
+                Predictions.push_back(Temp);
+            }
+            else
+            {
+                Predictions.push_back(Temp);
+                Predictions.pop_front();
             }
 
             if (Trajectory.size() < 10)
@@ -124,6 +136,7 @@ int main(int, char **)
             }
             //Predictions.push();
             Last_Trajectory = Trajectory;
+            Last_Predictions = Predictions;
         }
         else
         {
@@ -135,8 +148,25 @@ int main(int, char **)
                     line(drawing, Last_Trajectory.at(i) + Point(0, 10), Last_Trajectory.at(i) + Point(0, -10), Scalar(255, 0, 0), 6, 8);
                     line(drawing, Last_Trajectory.at(i), Last_Trajectory.at(i + 1), Scalar(255, 0, 0), 4, 8);
                 }
-                if (Trajectory.size() > 0){
+                if (Trajectory.size() > 0)
+                {
                     Trajectory.clear();
+                }
+            }
+            if (Last_Predictions.size() > 0)
+            {
+                for (unsigned i = 0; i < Last_Predictions.size(); i++)
+                {
+                    for (unsigned j = 0; j < Last_Predictions.at(i).size() - 1; j++)
+                    {
+                        line(drawing, Last_Predictions.at(i).at(j) + Point(10, 0), Last_Predictions.at(i).at(j) + Point(-10, 0), Scalar(255, 0, 255), 6, 8);
+                        line(drawing, Last_Predictions.at(i).at(j) + Point(0, 10), Last_Predictions.at(i).at(j) + Point(0, -10), Scalar(255, 0, 255), 6, 8);
+                        line(drawing, Last_Predictions.at(i).at(j), Last_Predictions.at(i).at(j + 1), Scalar(255, 0, 255), 4, 8);
+                    }
+                }
+                if (Predictions.size() > 0)
+                {
+                    Predictions.clear();
                 }
             }
         }
